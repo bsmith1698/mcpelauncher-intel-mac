@@ -88,6 +88,21 @@ if not args.skip_sync_sources:
     with open('mcpelauncher-ui.commit', 'r') as file:
         clone_repo('mcpelauncher-ui', 'https://github.com/minecraft-linux/mcpelauncher-ui-manifest.git', file.read().replace('\n', ''))
 
+# Local patches on top of the upstream sources: patches/<submodule>/*.patch is applied inside source/mcpelauncher/<submodule>
+PATCHES_DIR = path.abspath('patches')
+if path.isdir(PATCHES_DIR):
+    for submodule in sorted(listdir(PATCHES_DIR)):
+        patch_target = path.join(SOURCE_DIR, 'mcpelauncher', submodule)
+        for patch_name in sorted(listdir(path.join(PATCHES_DIR, submodule))):
+            if not patch_name.endswith('.patch'):
+                continue
+            patch_file = path.join(PATCHES_DIR, submodule, patch_name)
+            if subprocess.call(['git', 'apply', '--reverse', '--check', patch_file], cwd=patch_target, stderr=subprocess.DEVNULL) == 0:
+                display_stage("Patch already applied: " + submodule + "/" + patch_name)
+                continue
+            display_stage("Applying patch: " + submodule + "/" + patch_name)
+            call(['git', 'apply', patch_file], cwd=patch_target)
+
 # Build
 # QT_INSTALL_PATH = subprocess.check_output(['brew', '--prefix', 'qt']).decode('utf-8').strip()
 QT_INSTALL_PATH = path.abspath(args.qt_path)

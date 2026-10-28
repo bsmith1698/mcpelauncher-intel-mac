@@ -1,0 +1,69 @@
+diff --git a/src/common.cpp b/src/common.cpp
+index 2ef6d95..64ced88 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -23,6 +23,7 @@
+ #include <cwctype>
+ #include <csignal>
+ #include <cstring>
++#include <cstdlib>
+ #ifdef __APPLE__
+ #include <sys/fcntl.h>
+ #endif
+@@ -814,6 +815,7 @@ void shim::add_unistd_shimmed_symbols(std::vector<shim::shimmed_symbol> &list) {
+         {"fputwc", (void*)stub},
+         {"__system_property_read", (void*)stub},
+         {"abs", (void*)stub},
++        {"ldiv", ::ldiv},
+         {"utimes", (void*)stub},
+         {"__strrchr_chk", (void*)stub},
+     });
+@@ -849,6 +851,9 @@ void shim::add_signal_shimmed_symbols(std::vector<shim::shimmed_symbol> &list) {
+         {"sigprocmask", +[](int __how, const void * __set, void * __oset) -> int {
+             return 0;
+         }},
++        {"pthread_sigmask", +[](int __how, const void * __set, void * __oset) -> int {
++            return 0;
++        }},
+         {"sigemptyset", +[](void*) -> int {
+             return 0;
+         }},
+@@ -896,6 +901,7 @@ void shim::add_string_shimmed_symbols(std::vector<shim::shimmed_symbol> &list) {
+         {"strtok_r", ::strtok_r},
+         {"strerror", strerror},
+         {"strerror_r", strerror_r},
++        {"__gnu_strerror_r", gnu_strerror_r},
+         {"strnlen", ::strnlen},
+         {"strncat", ::strncat},
+         {"strndup", ::strndup},
+diff --git a/src/errno.cpp b/src/errno.cpp
+index be6c818..1ef9960 100644
+--- a/src/errno.cpp
++++ b/src/errno.cpp
+@@ -17,6 +17,13 @@ int shim::strerror_r(int err, char* buf, size_t len) {
+ #endif
+ }
+ 
++// GNU variant (used by newer libpairipcore): returns the message instead of a status code
++char *shim::gnu_strerror_r(int err, char* buf, size_t len) {
++    if (shim::strerror_r(err, buf, len) != 0 && len > 0)
++        buf[0] = '\0';
++    return buf;
++}
++
+ #ifdef ERRNO_TRANSLATION
+ 
+ thread_local int shim::bionic::errno_value;
+diff --git a/src/errno.h b/src/errno.h
+index bc93adc..2712744 100644
+--- a/src/errno.h
++++ b/src/errno.h
+@@ -39,6 +39,8 @@ namespace shim {
+ 
+     int strerror_r(int err, char* buf, size_t len);
+ 
++    char *gnu_strerror_r(int err, char* buf, size_t len);
++
+ 
+     namespace detail {
+ 
